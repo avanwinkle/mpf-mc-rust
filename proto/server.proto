@@ -127,6 +127,11 @@ message WidgetBezier {
     // TODO
 }
 
+enum UpdateState {
+    Clean = 0;
+    NeedsUpdate = 1;
+}
+
 enum AnchorX {
     TOP = 0;
     MIDDLE = 1;
@@ -146,6 +151,7 @@ message Widget {
     AnchorX anchor_x = 6;
     AnchorY anchor_y = 7;
     double opacity = 8;
+    UpdateState update_state = 9;
     oneof widget {
         WidgetLabel label_widget = 20;
         WidgetRectangle rectangle_widget = 21;

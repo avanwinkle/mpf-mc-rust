@@ -2,7 +2,7 @@ from mpf.core.custom_code import CustomCode
 
 import grpc
 from mpfdmc.server.server_pb2_grpc import MediaControllerStub
-from mpfdmc.server.server_pb2 import SlideAddRequest, WidgetAddRequest, ShowSlideRequest, SlideRemoveRequest, Widget
+from mpfdmc.server.server_pb2 import SlideAddRequest, WidgetAddRequest, ShowSlideRequest, SlideRemoveRequest, Widget, UpdateState
 from mpfdmc.config_players.rust_slide_player import RustSlidePlayer
 from mpfdmc.config_players.rust_widget_player import RustWidgetPlayer
 
@@ -46,9 +46,20 @@ class MCRustWindow(CustomCode):
         value = kwargs['value']
         self.info_log("Updating score to new value {}".format(value))
         if "score_widget" in self._widgets:
-            self._widgets["score_widget"].label_widget.text = "{:0>2,}".format(value)
+            widget = self._widgets["score_widget"]
+            widget.label_widget.text = "{:0>2,}".format(value)
+            widget.x = widget.x + 20
+            widget.update_state = UpdateState.NeedsUpdate
         else:
-            self._widgets["score_widget"] = widgets['score_widget'](value)
+            widget = widgets['score_widget'](value)
+            self._widgets["score_widget"] = widget
+
+            widget_add_request = WidgetAddRequest()
+            slide = self.get_or_add_slide('singleplayer_slide')
+            self.info_log("Attempting to add widget to slide id {} current slide {}".format(slide.slide_id, slide))
+            widget_add_request.slide_id = slide.slide_id
+            widget_add_request.widgets.append(widget)
+            self.mc.AddWidgetsToSlide(widget_add_request)
 
 
     def add_widgets_to_slide(self, settings, **kwargs):
@@ -74,6 +85,18 @@ class MCRustWindow(CustomCode):
         return self._slides.get(slide_name)
         # self.warning_log("Slide '{}' is unconfigured in Rust slides".format(slide_name))
 
+    def get_or_add_slide(self, slide_name):
+        # Fetch a slide request with the pre-populated widgets
+        slide = self.get_slide(slide_name)
+        # Generate a slide instance for the request
+        if not slide:
+            slide_request = slides[slide_name](
+                player=self.machine.game.player if self.machine.game else {}
+            )
+            slide = self.mc.AddSlide(slide_request)
+            self._slides[slide_name] = slide
+        return slide
+
     def get_widget(self, widget_name):
         # Don't cache widgets?
         if widgets.get(widget_name):
@@ -86,14 +109,7 @@ class MCRustWindow(CustomCode):
         self.add_and_show_slide(**kwargs)
 
     def add_and_show_slide(self, slide_name, **kwargs):
-        # Fetch a slide request with the pre-populated widgets
-        slide = self.get_slide(slide_name)
-        # Generate a slide instance for the request
-        if not slide:
-            slide_request = slides[slide_name](
-                player=self.machine.game.player if self.machine.game else {}
-            )
-            slide = self.mc.AddSlide(slide_request)
+        slide = self.get_or_add_slide(slide_name)
 
         # Generate a request to show the slide instance
         show_slide_request = ShowSlideRequest()

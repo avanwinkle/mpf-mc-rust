@@ -74,8 +74,8 @@ pub enum RenderState {
 }
 
 pub enum UpdateState {
-    NeedsUpdate,
-    Clean,
+    NeedsUpdate = 1,
+    Clean = 0,
 }
 
 pub enum WidgetType {
